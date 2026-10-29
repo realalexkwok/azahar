@@ -20,6 +20,30 @@ class RequestType(enum.IntEnum):
     TakeScreenshot = 5,
     ReadScreenshot = 6,
     GetPerfStats = 7,
+    SetPadState = 8,
+    GetPadState = 9,
+
+class PadButton(enum.IntFlag):
+    """Buttons of the emulated pad: accepted by set_pad_state(), returned by get_pad_state().
+    Combine them with |, e.g. PadButton.Y | PadButton.Start."""
+
+    A = 1 << 0
+    B = 1 << 1
+    Select = 1 << 2
+    Start = 1 << 3
+    Right = 1 << 4
+    Left = 1 << 5
+    Up = 1 << 6
+    Down = 1 << 7
+    R = 1 << 8
+    L = 1 << 9
+    X = 1 << 10
+    Y = 1 << 11
+    Debug = 1 << 12
+    Gpio14 = 1 << 13
+
+# Only the button bits are scripted; circle-pad direction bits (28-31) are not.
+PAD_BUTTON_MASK = 0x3FFF
 
 class ScreenshotResult(enum.IntEnum):
     Success = 0,
@@ -165,6 +189,35 @@ class AzaharRPC:
             else:
                 return False
         return True
+
+    def set_pad_state(self, buttons):
+        """
+        Holds the given buttons of the emulated pad. The scripted mask is merged (OR) with the
+        physical input on every HID update (~4.27 ms) until changed, so the game sees a normal
+        press/release. Pass 0 to release all scripted buttons; physical input keeps working.
+
+        >>> c.set_pad_state(PadButton.Y)
+        True
+        >>> c.set_pad_state(0)
+        True
+        """
+        buttons = int(buttons) & PAD_BUTTON_MASK
+        self._request(RequestType.SetPadState, struct.pack("II", buttons, 0))
+        return True
+
+    def get_pad_state(self):
+        """
+        Returns the current pad state as a PadButton mask: physical buttons merged with the
+        scripted ones, plus the circle-pad direction bits (28-31). Returns None if the
+        emulator did not reply.
+
+        >>> isinstance(c.get_pad_state(), PadButton)
+        True
+        """
+        reply_data = self._request(RequestType.GetPadState, struct.pack("II", 0, 0))
+        if len(reply_data) < 4:
+            return None
+        return PadButton(struct.unpack("I", reply_data[:4])[0])
 
     def _take_screenshot(self, res_scale, flags):
         # Do not resend, as a missed reply would return busy, instead wait long enough
