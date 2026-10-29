@@ -21,6 +21,12 @@ enum class PacketType : u32 {
     TakeScreenshot = 5,
     ReadScreenshot = 6,
     GetPerfStats = 7,
+    /// SetPadState: request payload is u32 buttons (bits 0-13), u32 reserved (must be 0).
+    /// The scripted mask is OR-ed into the emulated pad on every HID update until changed;
+    /// send 0 to release all scripted buttons.
+    SetPadState = 8,
+    /// GetPadState: reply payload is u32 PadState::hex (physical buttons plus scripted ones).
+    GetPadState = 9,
 };
 
 struct PacketHeader {

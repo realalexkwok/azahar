@@ -156,6 +156,7 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         ArticBaseController::ControllerData data = artic_controller->GetControllerData();
 
         state.hex = data.pad & HID_VALID_KEYS;
+        state.hex |= scripted_buttons.load(std::memory_order_relaxed);
 
         s16 circle_pad_x = data.c_pad_x;
         s16 circle_pad_y = data.c_pad_y;
@@ -216,6 +217,7 @@ void Module::UpdatePadCallback(std::uintptr_t user_data, s64 cycles_late) {
         state.select.Assign(buttons[Select - BUTTON_HID_BEGIN]->GetStatus());
         state.debug.Assign(buttons[Debug - BUTTON_HID_BEGIN]->GetStatus());
         state.gpio14.Assign(buttons[Gpio14 - BUTTON_HID_BEGIN]->GetStatus());
+        state.hex |= scripted_buttons.load(std::memory_order_relaxed);
 
         // Get current circle pad position and update circle pad direction
         float circle_pad_x_f, circle_pad_y_f;
@@ -710,6 +712,10 @@ void Module::ReloadInputDevices() {
 
 const PadState& Module::GetState() const {
     return state;
+}
+
+void Module::SetScriptedButtons(u32 buttons) {
+    scripted_buttons.store(buttons & 0x00003FFF, std::memory_order_relaxed);
 }
 
 std::shared_ptr<Module> GetModule(Core::System& system) {

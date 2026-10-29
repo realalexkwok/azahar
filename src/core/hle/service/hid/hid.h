@@ -338,6 +338,11 @@ public:
 
     const PadState& GetState() const;
 
+    /// Applies a scripted button mask on top of the physical pad state on every HID update.
+    /// Only bits 0-13 (A..Y, Debug, GPIO14) are honored; the mask is OR-ed with the physical
+    /// buttons. Send 0 to clear all scripted buttons.
+    void SetScriptedButtons(u32 buttons);
+
     // Updating period for each HID device. These empirical values are measured from a 11.2 3DS.
     static constexpr u64 pad_update_ticks = BASE_CLOCK_RATE_ARM11 / 234;
     static constexpr u64 accelerometer_update_ticks = BASE_CLOCK_RATE_ARM11 / 104;
@@ -364,6 +369,9 @@ private:
     // The HID module of a 3DS does not store the PadState.
     // Storing this here was necessary for emulation specific tasks like cheats or scripting.
     PadState state;
+
+    // Scripted buttons OR-ed into the pad state on every update (RPC pad-state support).
+    std::atomic<u32> scripted_buttons{0};
 
     // xperia64: These are used to averate the previous N raw circle pad inputs with the current raw
     // input to simulate the sluggishness of a real 3DS circle pad

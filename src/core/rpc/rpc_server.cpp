@@ -13,6 +13,8 @@
 #include "core/core.h"
 #include "core/frontend/framebuffer_layout.h"
 #include "core/hle/kernel/process.h"
+#include "core/hle/service/hid/hid.h"
+#include "core/hle/service/sm/sm.h"
 #include "core/memory.h"
 #include "core/rpc/packet.h"
 #include "core/rpc/rpc_server.h"
@@ -300,6 +302,32 @@ void RPCServer::HandleGetPerfStats(Packet& packet, PerfStatsMode mode) {
     packet.SendReply();
 }
 
+void RPCServer::HandleSetPadState(Packet& packet, u32 buttons) {
+    if (auto service =
+            system.ServiceManager().GetService<Service::HID::Module::Interface>("hid:USER")) {
+        service->GetModule()->SetScriptedButtons(buttons);
+    } else {
+        LOG_ERROR(RPC_Server, "Cannot set pad state: HID module is not available.");
+    }
+
+    packet.SetPacketDataSize(0);
+    packet.SendReply();
+}
+
+void RPCServer::HandleGetPadState(Packet& packet) {
+    u32 pad_state = 0;
+    if (auto service =
+            system.ServiceManager().GetService<Service::HID::Module::Interface>("hid:USER")) {
+        pad_state = service->GetModule()->GetState().hex;
+    } else {
+        LOG_ERROR(RPC_Server, "Cannot get pad state: HID module is not available.");
+    }
+
+    std::memcpy(packet.GetPacketData().data(), &pad_state, sizeof(pad_state));
+    packet.SetPacketDataSize(sizeof(pad_state));
+    packet.SendReply();
+}
+
 bool RPCServer::ValidatePacket(const PacketHeader& packet_header) {
     if (packet_header.version == CURRENT_VERSION) {
         switch (packet_header.packet_type) {
@@ -310,6 +338,8 @@ bool RPCServer::ValidatePacket(const PacketHeader& packet_header) {
         case PacketType::TakeScreenshot:
         case PacketType::ReadScreenshot:
         case PacketType::GetPerfStats:
+        case PacketType::SetPadState:
+        case PacketType::GetPadState:
             if (packet_header.packet_size >= (sizeof(u32) * 2)) {
                 return true;
             }
@@ -376,6 +406,14 @@ void RPCServer::DispatchRequest(std::unique_ptr<Packet> request_packet) {
         break;
     case PacketType::GetPerfStats:
         HandleGetPerfStats(*request_packet, (PerfStatsMode)arg1);
+        success = true;
+        break;
+    case PacketType::SetPadState:
+        HandleSetPadState(*request_packet, arg1);
+        success = true;
+        break;
+    case PacketType::GetPadState:
+        HandleGetPadState(*request_packet);
         success = true;
         break;
     default:
